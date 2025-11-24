@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+streamlit
+supabase
+sentence-transformers
+groq
+resend
+python-dotenv
+apscheduler
+trafilatura
+yt-dlp
+beautifulsoup4
+requests
+httpx
+python-multipart
+markdown
