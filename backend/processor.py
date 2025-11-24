@@ -71,6 +71,17 @@ async def process_and_email_resource(resource_id: int = None):
     send_email(target_email, email_data['subject'], html_body)
     logger.info(f"Email sent to {target_email}")
 
+    # 6. Update Resource Record
+    try:
+        supabase.table("resources").update({
+            "is_processed": True,
+            "email_sent": True,
+            "matched_topic": topic['topic_text']
+        }).eq("id", resource['id']).execute()
+        logger.info(f"Updated resource {resource['id']} status.")
+    except Exception as e:
+        logger.error(f"Failed to update resource status: {e}")
+
     return {
         "status": "success",
         "match": {
