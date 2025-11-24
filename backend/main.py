@@ -66,10 +66,18 @@ async def upload_curriculum(file: UploadFile = File(...)):
             # Store in DB
             data = {
                 "topic_text": topic,
-                "embedding": embedding
+                "embedding": embedding,
+                "source_file": filename
             }
             supabase.table("curriculum_topics").insert(data).execute()
             inserted_count += 1
+            
+        # Store the full file content for later retrieval
+        file_data = {
+            "filename": filename,
+            "content": content
+        }
+        supabase.table("curriculum_files").insert(file_data).execute()
             
         return {"status": "success", "message": f"Processed {inserted_count} topics from {file.filename}"}
 
@@ -123,6 +131,48 @@ async def upload_resource(request: ResourceRequest):
             "message": f"Processed {content_data['type']}: {inserted_chunks} chunks created."
         }
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/resources/{resource_id}")
+def delete_resource(resource_id: int):
+    """
+    Delete a resource and its chunks.
+    """
+    try:
+        # Delete chunks first (cascade should handle this, but good to be explicit or rely on DB)
+        # Our schema has ON DELETE CASCADE for chunks, so deleting resource is enough.
+        res = supabase.table("resources").delete().eq("id", resource_id).execute()
+        if not res.data:
+             raise HTTPException(status_code=404, detail="Resource not found")
+        return {"status": "success", "message": "Resource deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/curriculum/files")
+def list_curriculum_files():
+    """
+    List uploaded curriculum files.
+    """
+    try:
+        res = supabase.table("curriculum_files").select("id, filename, created_at").order("created_at", desc=True).execute()
+        return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/curriculum/files/{file_id}/content")
+def get_curriculum_file_content(file_id: int):
+    """
+    Get content of a curriculum file.
+    """
+    try:
+        res = supabase.table("curriculum_files").select("content, filename").eq("id", file_id).single().execute()
+        if not res.data:
+            raise HTTPException(status_code=404, detail="File not found")
+        return res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

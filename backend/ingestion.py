@@ -2,6 +2,7 @@ import trafilatura
 import yt_dlp
 import requests
 from urllib.parse import urlparse, parse_qs
+from bs4 import BeautifulSoup
 
 def extract_video_id(url: str) -> str:
     """
@@ -92,11 +93,23 @@ def fetch_content(url: str) -> dict:
         # It's an article/webpage
         downloaded = trafilatura.fetch_url(url)
         if downloaded:
-            text = trafilatura.extract(downloaded)
-            if text:
+            # Use bare_extraction to get metadata including title
+            data = trafilatura.bare_extraction(downloaded)
+            
+            if data and data.text:
+                title = data.title
+                
+                # Fallback to BeautifulSoup if title is missing
+                if not title:
+                    try:
+                        soup = BeautifulSoup(downloaded, 'html.parser')
+                        title = soup.title.string if soup.title else None
+                    except:
+                        pass
+                
                 return {
-                    "title": "Web Article", # Trafilatura might extract title but 'extract' returns string
-                    "text": text,
+                    "title": title or "Web Article", 
+                    "text": data.text,
                     "type": "article"
                 }
         raise Exception("Failed to fetch or extract content from URL")

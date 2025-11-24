@@ -72,23 +72,37 @@ if page == "Dashboard":
                 display_unread = unread_df[["title", "type", "created_at", "url"]].copy()
                 st.dataframe(display_unread, use_container_width=True)
                 
-                # Action to trigger email for unread
-                st.caption("Select a resource to trigger an email manually:")
-                resource_to_trigger = st.selectbox("Select Resource", unread_df["title"].tolist(), key="trigger_select")
-                if st.button("Trigger Email Now"):
-                    # Find ID
-                    res_id = unread_df[unread_df["title"] == resource_to_trigger].iloc[0]["id"]
-                    with st.spinner("Generating Email..."):
-                        trigger_res = requests.post(f"{API_URL}/trigger-email", params={"resource_id": int(res_id)})
-                        if trigger_res.status_code == 200:
-                            data = trigger_res.json()
-                            if data.get("status") == "success":
-                                st.success("Email Generated & Sent!")
-                                st.rerun() # Refresh to move to shared table
+                # Actions
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.caption("Trigger Email:")
+                    resource_to_trigger = st.selectbox("Select Resource to Email", unread_df["title"].tolist(), key="trigger_select")
+                    if st.button("Trigger Email Now"):
+                        res_id = unread_df[unread_df["title"] == resource_to_trigger].iloc[0]["id"]
+                        with st.spinner("Generating Email..."):
+                            trigger_res = requests.post(f"{API_URL}/trigger-email", params={"resource_id": int(res_id)})
+                            if trigger_res.status_code == 200:
+                                data = trigger_res.json()
+                                if data.get("status") == "success":
+                                    st.success("Email Generated & Sent!")
+                                    st.rerun()
+                                else:
+                                    st.info(data.get("message"))
                             else:
-                                st.info(data.get("message"))
-                        else:
-                            st.error("Failed to trigger email.")
+                                st.error("Failed to trigger email.")
+                
+                with col_b:
+                    st.caption("Delete Resource:")
+                    resource_to_delete = st.selectbox("Select Resource to Delete", unread_df["title"].tolist(), key="delete_select")
+                    if st.button("Delete Resource", type="primary"):
+                        res_id = unread_df[unread_df["title"] == resource_to_delete].iloc[0]["id"]
+                        with st.spinner("Deleting..."):
+                            del_res = requests.delete(f"{API_URL}/resources/{int(res_id)}")
+                            if del_res.status_code == 200:
+                                st.success("Resource Deleted!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete resource.")
             else:
                 st.info("No unread resources. Good job!")
 
@@ -127,6 +141,49 @@ elif page == "Upload Curriculum":
                         st.error(f"Error {response.status_code}: {response.text}")
                 except Exception as e:
                     st.error(f"Connection Error: {str(e)}")
+
+    st.divider()
+    st.subheader("Uploaded Curriculum")
+    
+    # Initialize session state for preview if not exists
+    if "preview_content" not in st.session_state:
+        st.session_state.preview_content = None
+    if "preview_filename" not in st.session_state:
+        st.session_state.preview_filename = None
+
+    try:
+        files = requests.get(f"{API_URL}/curriculum/files").json()
+        if files:
+            for f in files:
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.text(f"📄 {f['filename']} (Uploaded: {f['created_at']})")
+                with col2:
+                    if st.button("Preview", key=f"prev_{f['id']}"):
+                        # Fetch content
+                        with st.spinner("Loading content..."):
+                            res = requests.get(f"{API_URL}/curriculum/files/{f['id']}/content")
+                            if res.status_code == 200:
+                                data = res.json()
+                                st.session_state.preview_content = data['content']
+                                st.session_state.preview_filename = data['filename']
+                            else:
+                                st.error("Failed to load content.")
+            
+            # Display Preview if active
+            if st.session_state.preview_content:
+                st.divider()
+                st.subheader(f"📖 Preview: {st.session_state.preview_filename}")
+                st.text_area("File Content", st.session_state.preview_content, height=400)
+                if st.button("Close Preview"):
+                    st.session_state.preview_content = None
+                    st.session_state.preview_filename = None
+                    st.rerun()
+
+        else:
+            st.info("No files uploaded yet.")
+    except Exception as e:
+        st.error(f"Failed to fetch file list: {e}")
 
 elif page == "Add Resource":
     st.header("Add Resource")
