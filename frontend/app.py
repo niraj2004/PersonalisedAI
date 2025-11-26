@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import os
+import datetime # Added for Settings page
 
 # Default to localhost if not set, but in production this might change
 API_URL = os.getenv("API_URL", "http://localhost:8000")
@@ -10,7 +11,7 @@ st.set_page_config(page_title="Personal Learning Assistant", layout="wide")
 st.title("📚 Personal Learning Assistant")
 
 # Sidebar for navigation
-page = st.sidebar.radio("Navigation", ["Dashboard", "Upload Curriculum", "Add Resource"])
+page = st.sidebar.radio("Navigation", ["Dashboard", "Upload Curriculum", "Add Resource", "Settings"])
 
 # Health Check
 with st.sidebar:
@@ -189,17 +190,47 @@ elif page == "Add Resource":
     st.header("Add Resource")
     url = st.text_input("Enter Resource URL (YouTube or Article)")
     
-    if st.button("Add Resource"):
-        if url:
-            with st.spinner("Fetching and processing resource..."):
+    if st.button("Process Resource"):
+        if not url:
+            st.error("Please enter a URL")
+        else:
+            with st.spinner("Processing..."):
                 try:
                     response = requests.post(f"{API_URL}/upload/resource", json={"url": url})
                     if response.status_code == 200:
-                        data = response.json()
-                        st.success(f"Success! {data['message']}")
+                        st.success("Resource processed successfully!")
                     else:
-                        st.error(f"Error {response.status_code}: {response.text}")
+                        st.error(f"Error: {response.text}")
                 except Exception as e:
                     st.error(f"Connection Error: {str(e)}")
-        else:
-            st.warning("Please enter a URL")
+
+elif page == "Settings":
+    st.header("⚙️ Settings")
+    
+    st.subheader("Daily Email Schedule")
+    st.write("Choose when you want to receive your daily learning digest.")
+    
+    # Fetch current setting
+    current_time = datetime.time(8, 0)
+    try:
+        res = requests.get(f"{API_URL}/settings")
+        if res.status_code == 200:
+            time_str = res.json().get("daily_email_time", "08:00")
+            h, m = map(int, time_str.split(":"))
+            current_time = datetime.time(h, m)
+    except:
+        pass
+        
+    new_time = st.time_input("Select Time", value=current_time)
+    
+    if st.button("Save Schedule"):
+        time_str = new_time.strftime("%H:%M")
+        with st.spinner("Updating schedule..."):
+            try:
+                res = requests.post(f"{API_URL}/settings", json={"daily_email_time": time_str})
+                if res.status_code == 200:
+                    st.success(f"Schedule updated to {time_str}!")
+                else:
+                    st.error("Failed to update schedule.")
+            except Exception as e:
+                st.error(f"Connection Error: {e}")

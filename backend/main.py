@@ -149,8 +149,7 @@ def delete_resource(resource_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/curriculum/files")
 def list_curriculum_files():
@@ -173,6 +172,50 @@ def get_curriculum_file_content(file_id: int):
         if not res.data:
             raise HTTPException(status_code=404, detail="File not found")
         return res.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+from pydantic import BaseModel
+
+class SettingsUpdate(BaseModel):
+    daily_email_time: str
+
+@app.get("/settings")
+def get_settings():
+    """
+    Get application settings.
+    """
+    try:
+        res = supabase.table("settings").select("value").eq("key", "daily_email_time").single().execute()
+        if res.data:
+            return {"daily_email_time": res.data["value"]}
+        return {"daily_email_time": "08:00"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/settings")
+def update_settings(settings: SettingsUpdate):
+    """
+    Update application settings and reschedule job.
+    """
+    try:
+        # Validate time format
+        try:
+            hour, minute = map(int, settings.daily_email_time.split(":"))
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError
+        except:
+            raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+
+        # Update DB
+        data = {"key": "daily_email_time", "value": settings.daily_email_time}
+        supabase.table("settings").upsert(data).execute()
+        
+        # Reschedule Job
+        from backend.scheduler import reschedule_job
+        reschedule_job(hour, minute)
+        
+        return {"status": "success", "message": f"Schedule updated to {settings.daily_email_time}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
