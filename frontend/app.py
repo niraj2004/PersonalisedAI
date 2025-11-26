@@ -156,7 +156,7 @@ elif page == "Upload Curriculum":
         files = requests.get(f"{API_URL}/curriculum/files").json()
         if files:
             for f in files:
-                col1, col2 = st.columns([3, 1])
+                col1, col2, col3 = st.columns([3, 1, 1])
                 with col1:
                     st.text(f"📄 {f['filename']} (Uploaded: {f['created_at']})")
                 with col2:
@@ -170,6 +170,15 @@ elif page == "Upload Curriculum":
                                 st.session_state.preview_filename = data['filename']
                             else:
                                 st.error("Failed to load content.")
+                with col3:
+                    if st.button("Delete", key=f"del_{f['id']}", type="primary"):
+                        with st.spinner("Deleting..."):
+                            res = requests.delete(f"{API_URL}/curriculum/files/{f['id']}")
+                            if res.status_code == 200:
+                                st.success(f"Deleted {f['filename']}")
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete file.")
             
             # Display Preview if active
             if st.session_state.preview_content:
@@ -221,7 +230,7 @@ elif page == "Settings":
     except:
         pass
         
-    new_time = st.time_input("Select Time", value=current_time)
+    new_time = st.time_input("Select Time", value=current_time, step=60)
     
     if st.button("Save Schedule"):
         time_str = new_time.strftime("%H:%M")

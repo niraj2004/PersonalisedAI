@@ -175,6 +175,29 @@ def get_curriculum_file_content(file_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/curriculum/files/{file_id}")
+def delete_curriculum_file(file_id: int):
+    """
+    Delete a curriculum file and its associated topics.
+    """
+    try:
+        # 1. Get filename to delete associated topics
+        file_res = supabase.table("curriculum_files").select("filename").eq("id", file_id).single().execute()
+        if not file_res.data:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        filename = file_res.data["filename"]
+
+        # 2. Delete from curriculum_files
+        supabase.table("curriculum_files").delete().eq("id", file_id).execute()
+
+        # 3. Delete from curriculum_topics
+        supabase.table("curriculum_topics").delete().eq("source_file", filename).execute()
+
+        return {"status": "success", "message": f"Deleted {filename} and its topics"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 from pydantic import BaseModel
 
 class SettingsUpdate(BaseModel):
